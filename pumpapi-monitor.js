@@ -22,7 +22,7 @@ const tracked = new Map();
 const alerted = new Set();
 const buyers = new Map();
 
-const TARGET_MC_USD = 5000;
+const TARGET_MC_USD = 10000;
 
 async function updateSolPrice() {
 
@@ -187,7 +187,7 @@ buyers.set(
 
 if (
     marketCapUsd >= TARGET_MC_USD &&
-    uniqueBuyers >= 20 &&
+    uniqueBuyers >= 40 &&
     !alerted.has(
         event.mint
     )
