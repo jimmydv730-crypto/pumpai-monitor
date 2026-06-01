@@ -1,4 +1,15 @@
 require("dotenv").config();
+const express = require("express");
+
+const app = express();
+
+app.get("/", (req, res) => {
+    res.send("PumpAPI Monitor Running");
+});
+
+app.listen(process.env.PORT || 3000, () => {
+    console.log("Health server started");
+});
 
 const WebSocket = require("ws");
 const sendAlert = require("./alert");
@@ -32,9 +43,9 @@ async function updateSolPrice() {
     } catch (err) {
 
         console.log(
-            "SOL price update failed"
-        );
-
+    "SOL price update failed:",
+    err.message
+);
     }
 
 }
