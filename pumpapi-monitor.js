@@ -55,7 +55,6 @@ async function updateSolPrice() {
         );
 
     }
-
 }
 
 
