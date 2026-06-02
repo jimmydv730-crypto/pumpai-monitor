@@ -12,6 +12,23 @@ app.listen(process.env.PORT || 3000, () => {
 });
 
 const WebSocket = require("ws");
+const relayServer = new WebSocket.Server({
+    port: 9999
+});
+
+const relayClients = new Set();
+
+relayServer.on("connection", (client) => {
+
+    relayClients.add(client);
+
+    console.log("Graduation bot connected");
+
+    client.on("close", () => {
+        relayClients.delete(client);
+    });
+
+});
 const sendAlert = require("./alert");
 
 const axios = require("axios");
@@ -98,6 +115,13 @@ ws.on("open", () => {
 });
 
 ws.on("message", async (data) => {
+    for (const client of relayClients) {
+
+    if (client.readyState === WebSocket.OPEN) {
+        client.send(data.toString());
+    }
+
+}
 
     try {
 
