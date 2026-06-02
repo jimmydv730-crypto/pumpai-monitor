@@ -57,13 +57,13 @@ async function updateSolPrice() {
     }
 
 }
+let solPrice = 80;
+// updateSolPrice();
 
-updateSolPrice();
-
-setInterval(
-    updateSolPrice,
-    300000
-);
+// setInterval(
+//     updateSolPrice,
+//     300000
+// );
 
 // Remove tokens older than 30 minutes
 setInterval(() => {
@@ -302,15 +302,13 @@ ${uniqueBuyers}
 
 });
 
-ws.on("close", () => {
+ws.on("close", (code, reason) => {
 
     console.log(
-        "WebSocket closed - reconnecting in 5s"
+        "WebSocket closed:",
+        code,
+        reason.toString()
     );
-
-    setTimeout(() => {
-        process.exit(1);
-    }, 5000);
 
 });
 
