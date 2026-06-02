@@ -31,7 +31,7 @@ const buyers = new Map();
 
 const TARGET_MC_USD = 15000;
 
-let solPrice = 150;
+
 
 async function updateSolPrice() {
 
