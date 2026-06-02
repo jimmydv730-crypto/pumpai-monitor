@@ -1,5 +1,16 @@
 require("dotenv").config();
+
 const express = require("express");
+const WebSocket = require("ws");
+const TelegramBot = require("node-telegram-bot-api");
+const axios = require("axios");
+
+const sendAlert = require("./alert");
+
+const gradBot = new TelegramBot(
+    process.env.GRAD_BOT_TOKEN,
+    { polling: false }
+);
 
 const app = express();
 
@@ -11,32 +22,11 @@ app.listen(process.env.PORT || 3000, () => {
     console.log("Health server started");
 });
 
-const WebSocket = require("ws");
-const relayServer = new WebSocket.Server({
-    port: 9999
-});
-
-const relayClients = new Set();
-
-relayServer.on("connection", (client) => {
-
-    relayClients.add(client);
-
-    console.log("Graduation bot connected");
-
-    client.on("close", () => {
-        relayClients.delete(client);
-    });
-
-});
-const sendAlert = require("./alert");
-
-const axios = require("axios");
-
 let solPrice = 80;
 
 const tracked = new Map();
 const alerted = new Set();
+const graduated = new Set();
 const buyers = new Map();
 
 const TARGET_MC_USD = 15000;
@@ -46,7 +36,7 @@ async function updateSolPrice() {
     try {
 
         const { data } = await axios.get(
-            "https://price.jup.ag/v4/price?ids=SOL"
+             "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
         );
 
         solPrice =
@@ -60,9 +50,10 @@ async function updateSolPrice() {
     } catch (err) {
 
         console.log(
-    "SOL price update failed:",
-    err.message
-);
+            "SOL price update failed:",
+            err.message
+        );
+
     }
 
 }
@@ -115,18 +106,53 @@ ws.on("open", () => {
 });
 
 ws.on("message", async (data) => {
-    for (const client of relayClients) {
-
-    if (client.readyState === WebSocket.OPEN) {
-        client.send(data.toString());
-    }
-
-}
 
     try {
 
         const event =
             JSON.parse(data);
+
+        // Graduation Alert (Bot 2)
+        if (
+            event.pool === "pump" &&
+            event.tokensInPool === 0 &&
+            !graduated.has(event.mint)
+        ) {
+
+            graduated.add(event.mint);
+
+            await gradBot.sendMessage(
+                process.env.GRAD_CHAT_ID,
+                `
+🎓 NEW PUMP.FUN GRADUATION
+
+🪙 Name:
+${event.name}
+
+🏷 Symbol:
+${event.symbol}
+
+📍 Mint:
+\`${event.mint}\`
+
+👤 Creator:
+\`${event.creatorFeeAddress || "UNKNOWN"}\`
+
+💰 Market Cap:
+${Number(event.marketCapSol || 0).toFixed(2)} SOL
+
+🔗 https://pump.fun/coin/${event.mint}
+`,
+                {
+                    parse_mode: "Markdown"
+                }
+            );
+
+            console.log(
+                "GRADUATED:",
+                event.symbol
+            );
+        }
 
         if (
             event.pool !== "pump"
@@ -135,44 +161,44 @@ ws.on("message", async (data) => {
         }
 
         // New token created
-       if (
-    event.action === "create"
-) {
+        if (
+            event.action === "create"
+        ) {
 
-    if (
-        event.mayhemMode === true
-    ) {
-        return;
-    }
+            if (
+                event.mayhemMode === true
+            ) {
+                return;
+            }
 
-    if (
-        tracked.has(event.mint)
-    ) {
-        return;
-    }
+            if (
+                tracked.has(event.mint)
+            ) {
+                return;
+            }
 
-    tracked.set(
-    event.mint,
-    {
-        name: event.name,
-        symbol: event.symbol,
-        createdAt: Date.now()
-    }
-);
+            tracked.set(
+                event.mint,
+                {
+                    name: event.name,
+                    symbol: event.symbol,
+                    createdAt: Date.now()
+                }
+            );
 
-buyers.set(
-    event.mint,
-    new Set()
-);
+            buyers.set(
+                event.mint,
+                new Set()
+            );
 
-   console.log(
-    "TRACKING:",
-    event.symbol,
-    event.mint
-);
+            console.log(
+                "TRACKING:",
+                event.symbol,
+                event.mint
+            );
 
-    return;
-}
+            return;
+        }
 
         // Only care about buys/sells
         if (
@@ -190,32 +216,34 @@ buyers.set(
         ) {
             return;
         }
+
         if (
-    event.action === "buy"
-) {
+            event.action === "buy"
+        ) {
 
-    buyers
-        .get(event.mint)
-        ?.add(event.txSigner);
+            buyers
+                .get(event.mint)
+                ?.add(event.txSigner);
 
-}
+        }
 
         // Alert once when target MC reached
         const marketCapUsd =
-    event.marketCapQuote *
-    solPrice;
-    const uniqueBuyers =
-    buyers.get(
-        event.mint
-    )?.size || 0;
+            event.marketCapQuote *
+            solPrice;
 
-if (
-    marketCapUsd >= TARGET_MC_USD &&
-    uniqueBuyers >= 75 &&
-    !alerted.has(
-        event.mint
-    )
-) {
+        const uniqueBuyers =
+            buyers.get(
+                event.mint
+            )?.size || 0;
+
+        if (
+            marketCapUsd >= TARGET_MC_USD &&
+            uniqueBuyers >= 75 &&
+            !alerted.has(
+                event.mint
+            )
+        ) {
 
             alerted.add(
                 event.mint
@@ -225,7 +253,6 @@ if (
                 tracked.get(
                     event.mint
                 );
-                
 
             await sendAlert(`
 🚀 TOKEN REACHED TARGET MC
