@@ -31,16 +31,20 @@ const buyers = new Map();
 
 const TARGET_MC_USD = 15000;
 
+let solPrice = 150;
+
 async function updateSolPrice() {
 
     try {
 
-        const { data } = await axios.get(
-             "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+        const response = await axios.get(
+            "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT",
+            {
+                timeout: 10000
+            }
         );
 
-        solPrice =
-            data.data.SOL.price;
+        solPrice = Number(response.data.price);
 
         console.log(
             "SOL Price:",
@@ -55,15 +59,15 @@ async function updateSolPrice() {
         );
 
     }
+
 }
 
+updateSolPrice();
 
-// updateSolPrice();
-
-// setInterval(
-//     updateSolPrice,
-//     300000
-// );
+setInterval(
+    updateSolPrice,
+    180000
+);
 
 // Remove tokens older than 30 minutes
 setInterval(() => {
@@ -139,7 +143,12 @@ ${event.symbol}
 \`${event.creatorFeeAddress || "UNKNOWN"}\`
 
 💰 Market Cap:
-${Number(event.marketCapSol || 0).toFixed(2)} SOL
+$${((event.marketCapSol || 0) * solPrice).toLocaleString(
+    undefined,
+    {
+        maximumFractionDigits: 0
+    }
+)}
 
 🔗 https://pump.fun/coin/${event.mint}
 `,
