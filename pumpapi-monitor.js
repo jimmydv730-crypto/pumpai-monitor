@@ -57,7 +57,8 @@ async function updateSolPrice() {
     }
 
 }
-let solPrice = 80;
+
+
 // updateSolPrice();
 
 // setInterval(
