@@ -27,7 +27,7 @@ const alerted = new Set();
 const graduated = new Set();
 const buyers = new Map();
 
-const TARGET_MC_USD = 15000;
+const TARGET_MC_USD = 25000;
 
 
 
