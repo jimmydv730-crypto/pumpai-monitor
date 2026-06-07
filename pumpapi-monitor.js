@@ -97,6 +97,8 @@ setInterval(() => {
 
 }, 5 * 60 * 1000);
 
+function connectWebSocket() {
+
 const ws = new WebSocket(
     "wss://stream.pumpapi.io/"
 );
@@ -311,16 +313,6 @@ ${uniqueBuyers}
 
 });
 
-ws.on("close", (code, reason) => {
-
-    console.log(
-        "WebSocket closed:",
-        code,
-        reason.toString()
-    );
-
-});
-
 ws.on("error", (err) => {
 
     console.error(
@@ -329,3 +321,22 @@ ws.on("error", (err) => {
     );
 
 });
+
+ws.on("close", (code, reason) => {
+
+    console.log(
+        "WebSocket closed:",
+        code,
+        reason.toString()
+    );
+
+    setTimeout(
+        connectWebSocket,
+        5000
+    );
+
+});
+
+}
+
+connectWebSocket();
