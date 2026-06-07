@@ -2,15 +2,13 @@ require("dotenv").config();
 
 const express = require("express");
 const WebSocket = require("ws");
-const TelegramBot = require("node-telegram-bot-api");
+
 const axios = require("axios");
 
 const sendAlert = require("./alert");
+const sendGraduationAlert = require("./graduatedalert");
 
-const gradBot = new TelegramBot(
-    process.env.GRAD_BOT_TOKEN,
-    { polling: false }
-);
+
 
 const app = express();
 
@@ -127,9 +125,7 @@ ws.on("message", async (data) => {
 
             graduated.add(event.mint);
 
-            await gradBot.sendMessage(
-                process.env.GRAD_CHAT_ID,
-                `
+            await sendGraduationAlert(`
 🎓 NEW PUMP.FUN GRADUATION
 
 🪙 Name:
@@ -153,11 +149,7 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
 )}
 
 🔗 https://pump.fun/coin/${event.mint}
-`,
-                {
-                    parse_mode: "Markdown"
-                }
-            );
+`);
 
             console.log(
                 "GRADUATED:",
