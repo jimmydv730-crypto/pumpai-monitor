@@ -6,7 +6,7 @@ const WebSocket = require("ws");
 const axios = require("axios");
 
 const sendAlert = require("./alert");
-const sendGraduationAlert = require("./graduatedalert");
+const sendGraduationAlert = require("./graduationAlert");
 
 
 
