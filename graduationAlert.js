@@ -17,7 +17,7 @@ async function sendGraduationAlert(message) {
             }
         );
         await gradBot.sendMessage(
-            process.env.MADHU_CHAT_ID,
+            process.env.GRAD_MADHU_CHAT_ID,
             message,
             {
                 parse_mode: "Markdown"
