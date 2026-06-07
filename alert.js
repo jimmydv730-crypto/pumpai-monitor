@@ -16,6 +16,13 @@ async function sendAlert(message) {
               parse_mode: "Markdown"
             }
         );
+        await bot.sendMessage(
+            process.env.MADHU_CHAT_ID,
+            message,
+            {
+              parse_mode: "Markdown"
+            }
+        );
     } catch (err) {
         console.error(err);
     }
