@@ -340,8 +340,3 @@ ws.on("close", (code, reason) => {
 }
 
 connectWebSocket();
-const sendAlert = require("./alert");
-const sendGraduationAlert = require("./graduatedalert");
-
-sendAlert("Normal bot test");
-sendGraduationAlert("Graduation bot test");
