@@ -1,4 +1,6 @@
 require("dotenv").config();
+const sendWalletAlert =
+    require("./walletAlert");
 
 const express = require("express");
 const WebSocket = require("ws");
@@ -26,6 +28,9 @@ const tracked = new Map();
 const alerted = new Set();
 const graduated = new Set();
 const buyers = new Map();
+const walletLeaderboard = {};
+const earlyWallets = new Map();
+
 
 const TARGET_MC_USD = 19000;
 
@@ -185,7 +190,8 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                 {
                     name: event.name,
                     symbol: event.symbol,
-                    createdAt: Date.now()
+                    createdAt: Date.now(),
+                    earlyBuyers: []
                 }
             );
 
@@ -227,6 +233,81 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
             buyers
                 .get(event.mint)
                 ?.add(event.txSigner);
+
+            const token =
+                tracked.get(event.mint);
+
+            if (
+                token &&
+                token.earlyBuyers.length < 20
+            ) {
+
+                const alreadyExists =
+                    token.earlyBuyers.some(
+                        b =>
+                            b.wallet ===
+                            event.txSigner
+                    );
+
+                if (!alreadyExists) {
+
+                    const position =
+                        token.earlyBuyers.length + 1;
+
+                    token.earlyBuyers.push({
+                        wallet:
+                            event.txSigner,
+                        position
+                    });
+
+                    console.log(
+                        `EARLY BUYER #${position}:`,
+                        event.txSigner
+                    );
+
+                    if (
+                        !walletLeaderboard[
+                            event.txSigner
+                        ]
+                    ) {
+
+                        walletLeaderboard[
+                            event.txSigner
+                        ] = {
+                            appearances: 0,
+                            firstPlace: 0,
+                            top5: 0
+                        };
+
+                    }
+
+                    walletLeaderboard[
+                        event.txSigner
+                    ].appearances++;
+
+                    if (
+                        position === 1
+                    ) {
+
+                        walletLeaderboard[
+                            event.txSigner
+                        ].firstPlace++;
+
+                    }
+
+                    if (
+                        position <= 5
+                    ) {
+
+                        walletLeaderboard[
+                            event.txSigner
+                        ].top5++;
+
+                    }
+
+                }
+
+            }
 
         }
 
@@ -330,5 +411,106 @@ ws.on("close", (code, reason) => {
 });
 
 }
+setInterval(async () => {
 
+    const leaderboard =
+        Object.entries(walletLeaderboard)
+        .sort(
+    (a, b) =>
+        (
+            b[1].firstPlace * 5 +
+            b[1].top5 * 2 +
+            b[1].appearances
+        )
+        -
+        (
+            a[1].firstPlace * 5 +
+            a[1].top5 * 2 +
+            a[1].appearances
+        )
+)
+        .slice(0, 20);
+
+    let message =
+`🏆 TOP EARLY WALLETS
+Tracked Wallets: ${Object.keys(walletLeaderboard).length}
+
+`;
+
+    leaderboard.forEach(
+        ([wallet, stats], index) => {
+             const score =
+                stats.firstPlace * 5 +
+                stats.top5 * 2 +
+                stats.appearances;
+
+            message +=
+`${index + 1}. ${wallet.slice(0,8)}...
+Score: ${score}
+Appearances: ${stats.appearances}
+Top5: ${stats.top5}
+First: ${stats.firstPlace}
+
+`;
+
+        }
+    );
+    console.log(message);
+
+    await sendWalletAlert(
+        message
+    );
+    
+
+}, 30 * 1000);
+setTimeout(async () => {
+
+    console.log(
+        walletLeaderboard
+    );
+
+}, 30 * 60 * 1000);
 connectWebSocket();
+sendWalletAlert(
+    "✅ Wallet Tracker Bot Started"
+);
+setInterval(() => {
+
+    const leaderboard =
+        Object.entries(
+            walletLeaderboard
+        )
+        .sort(
+            (a, b) =>
+                b[1].top5 -
+                a[1].top5
+        )
+        .slice(0, 20);
+
+    console.log(
+        "\n===== TOP EARLY WALLETS ====="
+    );
+
+    leaderboard.forEach(
+        ([wallet, stats], index) => {
+
+            console.log(
+                `${index + 1}. ${wallet}`
+            );
+
+            console.log(
+                `Appearances: ${stats.appearances}`
+            );
+
+            console.log(
+                `Top5: ${stats.top5}`
+            );
+
+            console.log(
+                `First Buy: ${stats.firstPlace}`
+            );
+
+        }
+    );
+
+}, 10 * 60 * 1000);
