@@ -30,6 +30,7 @@ const graduated = new Set();
 const buyers = new Map();
 const walletLeaderboard = {};
 const earlyWallets = new Map();
+const walletPositions = new Map();
 
 
 const TARGET_MC_USD = 19000;
@@ -255,10 +256,17 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                         token.earlyBuyers.length + 1;
 
                     token.earlyBuyers.push({
-                        wallet:
-                            event.txSigner,
-                        position
-                    });
+                            wallet:
+                                event.txSigner,
+                            position
+                        });
+
+                        walletPositions.set(
+                            `${event.txSigner}_${event.mint}`,
+                            {
+                                buyTime: Date.now()
+                            }
+                        );
 
                     console.log(
                         `EARLY BUYER #${position}:`,
@@ -276,7 +284,8 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                         ] = {
                             appearances: 0,
                             firstPlace: 0,
-                            top5: 0
+                            top5: 0,
+                            fastSells: 0
                         };
 
                     }
@@ -310,6 +319,49 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
             }
 
         }
+        if (
+    event.action === "sell"
+) {
+
+    const key =
+        `${event.txSigner}_${event.mint}`;
+
+    const buyData =
+        walletPositions.get(key);
+
+    if (buyData) {
+
+        const holdSeconds =
+            (
+                Date.now() -
+                buyData.buyTime
+            ) / 1000;
+
+        if (
+            holdSeconds <= 5
+        ) {
+
+            if (
+                walletLeaderboard[
+                    event.txSigner
+                ]
+            ) {
+
+                walletLeaderboard[
+                    event.txSigner
+                ].fastSells++;
+
+            }
+
+        }
+
+        walletPositions.delete(
+            key
+        );
+
+    }
+
+}
 
         // Alert once when target MC reached
         const marketCapUsd =
@@ -414,7 +466,22 @@ ws.on("close", (code, reason) => {
 setInterval(async () => {
 
     const leaderboard =
-        Object.entries(walletLeaderboard)
+    Object.entries(walletLeaderboard)
+
+    .filter(
+        ([wallet, stats]) => {
+
+            const ratio =
+                (stats.fastSells || 0)
+                /
+                Math.max(
+                    stats.appearances,
+                    1
+                );
+
+            return ratio < 0.5;
+        }
+    )
         .sort(
     (a, b) =>
         (
@@ -445,11 +512,14 @@ Tracked Wallets: ${Object.keys(walletLeaderboard).length}
                 stats.appearances;
 
             message +=
-`${index + 1}. ${wallet.slice(0,8)}...
+`${index + 1}.
+\`${wallet}\`
+
 Score: ${score}
 Appearances: ${stats.appearances}
 Top5: ${stats.top5}
 First: ${stats.firstPlace}
+FastSells: ${stats.fastSells || 0}
 
 `;
 
