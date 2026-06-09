@@ -383,8 +383,13 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
 
         // Alert once when target MC reached
         const marketCapUsd =
-            event.marketCapQuote *
-            solPrice;
+            event.marketCapQuote;
+            console.log({
+    symbol: event.symbol,
+    marketCapQuote: event.marketCapQuote,
+    solPrice,
+    calculatedMc: marketCapUsd
+});
             const token =
                 tracked.get(event.mint);
 
