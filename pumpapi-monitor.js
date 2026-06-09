@@ -200,7 +200,10 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                     hit50k: false,
                     hit100k: false,
 
-                    rewarded: false,
+                    reward10k: false,
+                    reward25k: false,
+                    reward50k: false,
+                    reward100k: false,
 
                     earlyBuyers: []
                 }
@@ -407,40 +410,81 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
             }
             if (
     token &&
-    !token.rewarded &&
-    token.hit100k
+    token.hit10k &&
+    !token.reward10k
 ) {
 
-    token.rewarded = true;
+    token.reward10k = true;
 
     token.earlyBuyers.forEach(
         buyer => {
 
-            const stats =
-                walletLeaderboard[
-                    buyer.wallet
-                ];
-
-            if (!stats)
-                return;
-
-            if (token.hit10k)
-                stats.hit10k++;
-
-            if (token.hit25k)
-                stats.hit25k++;
-
-            if (token.hit50k)
-                stats.hit50k++;
-
-            if (token.hit100k)
-                stats.hit100k++;
+            walletLeaderboard[
+                buyer.wallet
+            ]?.hit10k++;
 
         }
     );
 
 }
+if (
+    token &&
+    token.hit25k &&
+    !token.reward25k
+) {
 
+    token.reward25k = true;
+
+    token.earlyBuyers.forEach(
+        buyer => {
+
+            walletLeaderboard[
+                buyer.wallet
+            ]?.hit25k++;
+
+        }
+    );
+
+}
+if (
+    token &&
+    token.hit50k &&
+    !token.reward50k
+) {
+
+    token.reward50k = true;
+
+    token.earlyBuyers.forEach(
+        buyer => {
+
+            walletLeaderboard[
+                buyer.wallet
+            ]?.hit50k++;
+
+        }
+    );
+
+}
+if (
+    token &&
+    token.hit100k &&
+    !token.reward100k
+) {
+
+    token.reward100k = true;
+
+    token.earlyBuyers.forEach(
+        buyer => {
+
+            walletLeaderboard[
+                buyer.wallet
+            ]?.hit100k++;
+
+        }
+    );
+
+}
+          
         const uniqueBuyers =
             buyers.get(
                 event.mint
@@ -557,17 +601,23 @@ setInterval(async () => {
     )
         .sort(
     (a, b) =>
-        (
-            b[1].firstPlace * 5 +
-            b[1].top5 * 2 +
-            b[1].appearances
-        )
-        -
-        (
-            a[1].firstPlace * 5 +
-            a[1].top5 * 2 +
-            a[1].appearances
-        )
+       (
+    b[1].hit100k * 50 +
+    b[1].hit50k * 15 +
+    b[1].hit25k * 5 +
+    b[1].firstPlace * 5 +
+    b[1].top5 * 2 +
+    b[1].appearances
+)
+-
+(
+    a[1].hit100k * 50 +
+    a[1].hit50k * 15 +
+    a[1].hit25k * 5 +
+    a[1].firstPlace * 5 +
+    a[1].top5 * 2 +
+    a[1].appearances
+)
 )
         .slice(0, 20);
 
