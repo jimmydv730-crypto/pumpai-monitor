@@ -82,7 +82,7 @@ setInterval(() => {
 
         if (
             now - info.createdAt >
-            30 * 60 * 1000
+            6 * 60 * 60 * 1000
         ) {
             tracked.delete(mint);
         }
@@ -192,6 +192,16 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                     name: event.name,
                     symbol: event.symbol,
                     createdAt: Date.now(),
+
+                    athMc: 0,
+
+                    hit10k: false,
+                    hit25k: false,
+                    hit50k: false,
+                    hit100k: false,
+
+                    rewarded: false,
+
                     earlyBuyers: []
                 }
             );
@@ -279,13 +289,18 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                         ]
                     ) {
 
-                        walletLeaderboard[
+                       walletLeaderboard[
                             event.txSigner
                         ] = {
                             appearances: 0,
                             firstPlace: 0,
                             top5: 0,
-                            fastSells: 0
+                            fastSells: 0,
+
+                            hit10k: 0,
+                            hit25k: 0,
+                            hit50k: 0,
+                            hit100k: 0
                         };
 
                     }
@@ -367,6 +382,64 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
         const marketCapUsd =
             event.marketCapQuote *
             solPrice;
+            const token =
+                tracked.get(event.mint);
+
+            if (token) {
+
+                token.athMc = Math.max(
+                    token.athMc,
+                    marketCapUsd
+                );
+
+                if (marketCapUsd >= 10000)
+                    token.hit10k = true;
+
+                if (marketCapUsd >= 25000)
+                    token.hit25k = true;
+
+                if (marketCapUsd >= 50000)
+                    token.hit50k = true;
+
+                if (marketCapUsd >= 100000)
+                    token.hit100k = true;
+
+            }
+            if (
+    token &&
+    !token.rewarded &&
+    token.hit100k
+) {
+
+    token.rewarded = true;
+
+    token.earlyBuyers.forEach(
+        buyer => {
+
+            const stats =
+                walletLeaderboard[
+                    buyer.wallet
+                ];
+
+            if (!stats)
+                return;
+
+            if (token.hit10k)
+                stats.hit10k++;
+
+            if (token.hit25k)
+                stats.hit25k++;
+
+            if (token.hit50k)
+                stats.hit50k++;
+
+            if (token.hit100k)
+                stats.hit100k++;
+
+        }
+    );
+
+}
 
         const uniqueBuyers =
             buyers.get(
@@ -507,9 +580,12 @@ Tracked Wallets: ${Object.keys(walletLeaderboard).length}
     leaderboard.forEach(
         ([wallet, stats], index) => {
              const score =
-                stats.firstPlace * 5 +
-                stats.top5 * 2 +
-                stats.appearances;
+                    stats.hit100k * 50 +
+                    stats.hit50k * 15 +
+                    stats.hit25k * 5 +
+                    stats.firstPlace * 5 +
+                    stats.top5 * 2 +
+                    stats.appearances;
 
             message +=
 `${index + 1}.
@@ -520,6 +596,10 @@ Appearances: ${stats.appearances}
 Top5: ${stats.top5}
 First: ${stats.firstPlace}
 FastSells: ${stats.fastSells || 0}
+10k Hits: ${stats.hit10k || 0}
+25k Hits: ${stats.hit25k || 0}
+50k Hits: ${stats.hit50k || 0}
+100k Hits: ${stats.hit100k || 0}
 
 `;
 
