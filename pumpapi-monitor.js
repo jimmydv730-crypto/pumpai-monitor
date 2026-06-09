@@ -419,9 +419,15 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
     token.earlyBuyers.forEach(
         buyer => {
 
-            walletLeaderboard[
-                buyer.wallet
-            ]?.hit10k++;
+           if (
+    walletLeaderboard[
+        buyer.wallet
+    ]
+) {
+    walletLeaderboard[
+        buyer.wallet
+    ].hit10k++;
+}
 
         }
     );
@@ -438,9 +444,15 @@ if (
     token.earlyBuyers.forEach(
         buyer => {
 
-            walletLeaderboard[
-                buyer.wallet
-            ]?.hit25k++;
+            if (
+    walletLeaderboard[
+        buyer.wallet
+    ]
+) {
+    walletLeaderboard[
+        buyer.wallet
+    ].hit25k++;
+}
 
         }
     );
@@ -457,9 +469,15 @@ if (
     token.earlyBuyers.forEach(
         buyer => {
 
-            walletLeaderboard[
-                buyer.wallet
-            ]?.hit50k++;
+            if (
+    walletLeaderboard[
+        buyer.wallet
+    ]
+) {
+    walletLeaderboard[
+        buyer.wallet
+    ].hit50k++;
+}
 
         }
     );
@@ -476,9 +494,15 @@ if (
     token.earlyBuyers.forEach(
         buyer => {
 
-            walletLeaderboard[
-                buyer.wallet
-            ]?.hit100k++;
+            if (
+    walletLeaderboard[
+        buyer.wallet
+    ]
+) {
+    walletLeaderboard[
+        buyer.wallet
+    ].hit100k++;
+}
 
         }
     );
