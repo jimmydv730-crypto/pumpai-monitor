@@ -1,6 +1,5 @@
 require("dotenv").config();
-const sendWalletAlert =
-    require("./walletAlert");
+const sendWalletAlert = require("./walletAlert");
 
 const express = require("express");
 const WebSocket = require("ws");
@@ -10,16 +9,14 @@ const axios = require("axios");
 const sendAlert = require("./alert");
 const sendGraduationAlert = require("./graduationAlert");
 
-
-
 const app = express();
 
 app.get("/", (req, res) => {
-    res.send("PumpAPI Monitor Running");
+  res.send("PumpAPI Monitor Running");
 });
 
 app.listen(process.env.PORT || 3000, () => {
-    console.log("Health server started");
+  console.log("Health server started");
 });
 
 let solPrice = 80;
@@ -34,168 +31,102 @@ const walletPositions = new Map();
 const walletTrades = {};
 const tokenBuyers = new Map();
 
-
 const TARGET_MC_USD = 19000;
 
-
-
 async function updateSolPrice() {
+  try {
+    const response = await axios.get(
+      "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT",
+      {
+        timeout: 10000,
+      },
+    );
 
-    try {
+    solPrice = Number(response.data.price);
 
-        const response = await axios.get(
-            "https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT",
-            {
-                timeout: 10000
-            }
-        );
-
-        solPrice = Number(response.data.price);
-
-        console.log(
-            "SOL Price:",
-            solPrice
-        );
-
-    } catch (err) {
-
-        console.log(
-            "SOL price update failed:",
-            err.message
-        );
-
-    }
-
+    console.log("SOL Price:", solPrice);
+  } catch (err) {
+    console.log("SOL price update failed:", err.message);
+  }
 }
 
 updateSolPrice();
 
-setInterval(
-    updateSolPrice,
-    180000
-);
+setInterval(updateSolPrice, 180000);
 
 // Remove tokens older than 30 minutes
 setInterval(() => {
+  const now = Date.now();
 
-    const now = Date.now();
+  for (const [mint, info] of tracked) {
+    if (now - info.createdAt > 10 * 60 * 1000) {
+      const buyersForToken = tokenBuyers.get(mint) || [];
 
-    for (const [mint, info] of tracked) {
+      buyersForToken.forEach((buyer) => {
+        if (buyer.buyMc > 25000) return;
 
-        if (
-            now - info.createdAt >
-           10 * 60 * 1000
-        ) {
-          const buyersForToken =
-    tokenBuyers.get(mint) || [];
+        const multiple = info.athMc / buyer.buyMc;
+        console.log(buyer.wallet, "MULTIPLE:", multiple.toFixed(2));
 
-buyersForToken.forEach(
-    buyer => {
-        if (buyer.buyMc > 25000)
-    return;
+        if (!walletTrades[buyer.wallet]) {
+          walletTrades[buyer.wallet] = {
+            trades: 0,
 
-        const multiple =
-            info.athMc /
-            buyer.buyMc;
-            console.log(
-    buyer.wallet,
-    "MULTIPLE:",
-    multiple.toFixed(2)
-);
+            totalMultiple: 0,
 
-        if (
-            !walletTrades[
-                buyer.wallet
-            ]
-        ) {
-
-            walletTrades[
-                buyer.wallet
-            ] = {
-
-                trades: 0,
-
-                totalMultiple: 0,
-
-                winners2x: 0,
-                winners5x: 0,
-                winners10x: 0
-
-            };
-
+            winners2x: 0,
+            winners5x: 0,
+            winners10x: 0,
+          };
         }
 
-        const stats =
-            walletTrades[
-                buyer.wallet
-            ];
+        const stats = walletTrades[buyer.wallet];
 
         stats.trades++;
 
-        stats.totalMultiple +=
-            multiple;
+        stats.totalMultiple += multiple;
 
-        if (multiple >= 2)
-            stats.winners2x++;
+        if (multiple >= 2) stats.winners2x++;
 
-        if (multiple >= 5)
-            stats.winners5x++;
+        if (multiple >= 5) stats.winners5x++;
 
-        if (multiple >= 10)
-            stats.winners10x++;
-
+        if (multiple >= 10) stats.winners10x++;
+      });
+      tokenBuyers.delete(mint);
+      buyers.delete(mint);
+      tracked.delete(mint);
     }
-);
-tokenBuyers.delete(mint);
-buyers.delete(mint);            
-tracked.delete(mint);
-        }
-
-    }
-
+  }
 }, 60 * 1000);
 
 // Health check every 5 minutes
-setInterval(() => {
-
-    console.log(
-        "Tracked tokens:",
-        tracked.size
-    );
-
-}, 5 * 60 * 1000);
-
-function connectWebSocket() {
-
-const ws = new WebSocket(
-    "wss://stream.pumpapi.io/"
+setInterval(
+  () => {
+    console.log("Tracked tokens:", tracked.size);
+  },
+  5 * 60 * 1000,
 );
 
-ws.on("open", () => {
+function connectWebSocket() {
+  const ws = new WebSocket("wss://stream.pumpapi.io/");
 
-    console.log(
-        "Connected to PumpAPI"
-    );
+  ws.on("open", () => {
+    console.log("Connected to PumpAPI");
+  });
 
-});
-
-ws.on("message", async (data) => {
-
+  ws.on("message", async (data) => {
     try {
+      const event = JSON.parse(data);
 
-        const event =
-            JSON.parse(data);
+      // Graduation Alert (Bot 2)
+      if (
+        event.pool === "pump" &&
+        event.tokensInPool === 0 &&
+        !graduated.has(event.mint)
+      ) {
+        graduated.add(event.mint);
 
-        // Graduation Alert (Bot 2)
-        if (
-            event.pool === "pump" &&
-            event.tokensInPool === 0 &&
-            !graduated.has(event.mint)
-        ) {
-
-            graduated.add(event.mint);
-
-            await sendGraduationAlert(`
+        await sendGraduationAlert(`
 🎓 NEW PUMP.FUN GRADUATION
 
 🪙 Name:
@@ -211,441 +142,229 @@ ${event.symbol}
 \`${event.creatorFeeAddress || "UNKNOWN"}\`
 
 💰 Market Cap:
-$${((event.marketCapSol || 0) * solPrice).toLocaleString(
-    undefined,
-    {
-        maximumFractionDigits: 0
-    }
-)}
+$${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
+          maximumFractionDigits: 0,
+        })}
 
 🔗 https://pump.fun/coin/${event.mint}
 `);
 
-            console.log(
-                "GRADUATED:",
-                event.symbol
-            );
+        console.log("GRADUATED:", event.symbol);
+      }
+
+      if (event.pool !== "pump") {
+        return;
+      }
+
+      // New token created
+      if (event.action === "create") {
+        if (event.mayhemMode === true) {
+          return;
         }
 
-        if (
-            event.pool !== "pump"
-        ) {
-            return;
+        if (tracked.has(event.mint)) {
+          return;
         }
 
-        // New token created
-        if (
-            event.action === "create"
-        ) {
+        tracked.set(event.mint, {
+          name: event.name,
+          symbol: event.symbol,
+          createdAt: Date.now(),
 
-            if (
-                event.mayhemMode === true
-            ) {
-                return;
+          athMc: 0,
+
+          hit10k: false,
+          hit25k: false,
+          hit50k: false,
+          hit100k: false,
+
+          reward10k: false,
+          reward25k: false,
+          reward50k: false,
+          reward100k: false,
+
+          earlyBuyers: [],
+        });
+
+        buyers.set(event.mint, new Set());
+        tokenBuyers.set(event.mint, []);
+
+        console.log("TRACKING:", event.symbol, event.mint);
+
+        return;
+      }
+
+      // Only care about buys/sells
+      if (event.action !== "buy" && event.action !== "sell") {
+        return;
+      }
+
+      // Only monitor tokens created after bot started
+      if (!tracked.has(event.mint)) {
+        return;
+      }
+
+      if (event.action === "buy") {
+        buyers.get(event.mint)?.add(event.txSigner);
+
+        const token = tracked.get(event.mint);
+
+        {
+          const alreadyExists = token.earlyBuyers.some(
+            (b) => b.wallet === event.txSigner,
+          );
+
+          if (!alreadyExists) {
+            const position = token.earlyBuyers.length + 1;
+
+            token.earlyBuyers.push({
+              wallet: event.txSigner,
+              position,
+            });
+
+            walletPositions.set(`${event.txSigner}_${event.mint}`, {
+              buyTime: Date.now(),
+            });
+
+            console.log(`EARLY BUYER #${position}:`, event.txSigner);
+
+            if (!walletLeaderboard[event.txSigner]) {
+              walletLeaderboard[event.txSigner] = {
+                appearances: 0,
+                firstPlace: 0,
+                top5: 0,
+                fastSells: 0,
+
+                hit10k: 0,
+                hit25k: 0,
+                hit50k: 0,
+                hit100k: 0,
+              };
             }
 
-            if (
-                tracked.has(event.mint)
-            ) {
-                return;
+            walletLeaderboard[event.txSigner].appearances++;
+
+            if (position === 1) {
+              walletLeaderboard[event.txSigner].firstPlace++;
             }
 
-            tracked.set(
-                event.mint,
-                {
-                    name: event.name,
-                    symbol: event.symbol,
-                    createdAt: Date.now(),
-
-                    athMc: 0,
-
-                    hit10k: false,
-                    hit25k: false,
-                    hit50k: false,
-                    hit100k: false,
-
-                    reward10k: false,
-                    reward25k: false,
-                    reward50k: false,
-                    reward100k: false,
-
-                    earlyBuyers: []
-                }
-            );
-
-            buyers.set(
-                event.mint,
-                new Set()
-            );
-            tokenBuyers.set(
-    event.mint,
-    []
-);
-
-            console.log(
-                "TRACKING:",
-                event.symbol,
-                event.mint
-            );
-
-            return;
-        }
-
-        // Only care about buys/sells
-        if (
-            event.action !== "buy" &&
-            event.action !== "sell"
-        ) {
-            return;
-        }
-
-        // Only monitor tokens created after bot started
-        if (
-            !tracked.has(
-                event.mint
-            )
-        ) {
-            return;
-        }
-
-        if (
-            event.action === "buy"
-        ) {
-
-            buyers
-                .get(event.mint)
-                ?.add(event.txSigner);
-
-            const token =
-                tracked.get(event.mint);
-
-            {
-
-                const alreadyExists =
-                    token.earlyBuyers.some(
-                        b =>
-                            b.wallet ===
-                            event.txSigner
-                    );
-
-                if (!alreadyExists) {
-
-                    const position =
-                        token.earlyBuyers.length + 1;
-
-                    token.earlyBuyers.push({
-                            wallet:
-                                event.txSigner,
-                            position
-                        });
-
-                        walletPositions.set(
-                            `${event.txSigner}_${event.mint}`,
-                            {
-                                buyTime: Date.now()
-                            }
-                        );
-
-                    console.log(
-                        `EARLY BUYER #${position}:`,
-                        event.txSigner
-                    );
-
-                    if (
-                        !walletLeaderboard[
-                            event.txSigner
-                        ]
-                    ) {
-
-                       walletLeaderboard[
-                            event.txSigner
-                        ] = {
-                            appearances: 0,
-                            firstPlace: 0,
-                            top5: 0,
-                            fastSells: 0,
-
-                            hit10k: 0,
-                            hit25k: 0,
-                            hit50k: 0,
-                            hit100k: 0
-                        };
-
-                    }
-
-                    walletLeaderboard[
-                        event.txSigner
-                    ].appearances++;
-
-                    if (
-                        position === 1
-                    ) {
-
-                        walletLeaderboard[
-                            event.txSigner
-                        ].firstPlace++;
-
-                    }
-
-                    if (
-                        position <= 5
-                    ) {
-
-                        walletLeaderboard[
-                            event.txSigner
-                        ].top5++;
-
-                    }
-
-                }
-
+            if (position <= 5) {
+              walletLeaderboard[event.txSigner].top5++;
             }
-
+          }
         }
-        if (
-    event.action === "sell"
-) {
+      }
+      if (event.action === "sell") {
+        const key = `${event.txSigner}_${event.mint}`;
 
-    const key =
-        `${event.txSigner}_${event.mint}`;
+        const buyData = walletPositions.get(key);
 
-    const buyData =
-        walletPositions.get(key);
+        if (buyData) {
+          const holdSeconds = (Date.now() - buyData.buyTime) / 1000;
 
-    if (buyData) {
-
-        const holdSeconds =
-            (
-                Date.now() -
-                buyData.buyTime
-            ) / 1000;
-
-        if (
-            holdSeconds <= 5
-        ) {
-
-            if (
-                walletLeaderboard[
-                    event.txSigner
-                ]
-            ) {
-
-                walletLeaderboard[
-                    event.txSigner
-                ].fastSells++;
-
+          if (holdSeconds <= 5) {
+            if (walletLeaderboard[event.txSigner]) {
+              walletLeaderboard[event.txSigner].fastSells++;
             }
+          }
 
+          walletPositions.delete(key);
         }
+      }
 
-        walletPositions.delete(
-            key
-        );
+      // Alert once when target MC reached
+      const marketCapUsd = event.marketCapQuote;
+      if (event.action === "buy") {
+        tokenBuyers.get(event.mint)?.push({
+          wallet: event.txSigner,
 
-    }
+          buyMc: marketCapUsd,
+        });
+      }
+      if (!walletTrades[event.txSigner]) {
+        walletTrades[event.txSigner] = {
+          trades: 0,
 
-}
+          totalMultiple: 0,
 
-        // Alert once when target MC reached
-        const marketCapUsd =
-            event.marketCapQuote;
-            if (
-    event.action === "buy"
-) {
+          winners2x: 0,
+          winners5x: 0,
+          winners10x: 0,
+        };
+      }
 
-    tokenBuyers
-    .get(event.mint)
-    ?.push({
-
-        wallet:
-            event.txSigner,
-
-        buyMc:
-            marketCapUsd
-
-    });
-
-}
-         if (
-    !walletTrades[
-        event.txSigner
-    ]
-) {
-
-    walletTrades[
-        event.txSigner
-    ] = {
-        trades: 0,
-
-        totalMultiple: 0,
-
-        winners2x: 0,
-        winners5x: 0,
-        winners10x: 0
-    };
-
-}
-
-walletPositions.set(
-    `${event.txSigner}_${event.mint}`,
-    {
+      walletPositions.set(`${event.txSigner}_${event.mint}`, {
         buyMc: marketCapUsd,
-        buyTime: Date.now()
-    }
-);
-            console.log({
-    symbol: event.symbol,
-    marketCapQuote: event.marketCapQuote,
-    solPrice,
-    calculatedMc: marketCapUsd
-});
-            const token =
-                tracked.get(event.mint);
+        buyTime: Date.now(),
+      });
+      console.log({
+        symbol: event.symbol,
+        marketCapQuote: event.marketCapQuote,
+        solPrice,
+        calculatedMc: marketCapUsd,
+      });
+      const token = tracked.get(event.mint);
 
-            if (token) {
+      if (token) {
+        token.athMc = Math.max(token.athMc, marketCapUsd);
 
-                token.athMc = Math.max(
-                    token.athMc,
-                    marketCapUsd
-                );
+        if (marketCapUsd >= 10000) token.hit10k = true;
 
-                if (marketCapUsd >= 10000)
-                    token.hit10k = true;
+        if (marketCapUsd >= 25000) token.hit25k = true;
 
-                if (marketCapUsd >= 25000)
-                    token.hit25k = true;
+        if (marketCapUsd >= 50000) token.hit50k = true;
 
-                if (marketCapUsd >= 50000)
-                    token.hit50k = true;
+        if (marketCapUsd >= 100000) token.hit100k = true;
+      }
+      if (token && token.hit10k && !token.reward10k) {
+        token.reward10k = true;
 
-                if (marketCapUsd >= 100000)
-                    token.hit100k = true;
+        token.earlyBuyers.forEach((buyer) => {
+          if (walletLeaderboard[buyer.wallet]) {
+            walletLeaderboard[buyer.wallet].hit10k++;
+          }
+        });
+      }
+      if (token && token.hit25k && !token.reward25k) {
+        token.reward25k = true;
 
-            }
-            if (
-    token &&
-    token.hit10k &&
-    !token.reward10k
-) {
+        token.earlyBuyers.forEach((buyer) => {
+          if (walletLeaderboard[buyer.wallet]) {
+            walletLeaderboard[buyer.wallet].hit25k++;
+          }
+        });
+      }
+      if (token && token.hit50k && !token.reward50k) {
+        token.reward50k = true;
 
-    token.reward10k = true;
+        token.earlyBuyers.forEach((buyer) => {
+          if (walletLeaderboard[buyer.wallet]) {
+            walletLeaderboard[buyer.wallet].hit50k++;
+          }
+        });
+      }
+      if (token && token.hit100k && !token.reward100k) {
+        token.reward100k = true;
 
-    token.earlyBuyers.forEach(
-        buyer => {
+        token.earlyBuyers.forEach((buyer) => {
+          if (walletLeaderboard[buyer.wallet]) {
+            walletLeaderboard[buyer.wallet].hit100k++;
+          }
+        });
+      }
 
-           if (
-    walletLeaderboard[
-        buyer.wallet
-    ]
-) {
-    walletLeaderboard[
-        buyer.wallet
-    ].hit10k++;
-}
+      const uniqueBuyers = buyers.get(event.mint)?.size || 0;
 
-        }
-    );
+      if (
+        marketCapUsd >= TARGET_MC_USD &&
+        uniqueBuyers >= 75 &&
+        !alerted.has(event.mint)
+      ) {
+        alerted.add(event.mint);
 
-}
-if (
-    token &&
-    token.hit25k &&
-    !token.reward25k
-) {
+        const info = tracked.get(event.mint);
 
-    token.reward25k = true;
-
-    token.earlyBuyers.forEach(
-        buyer => {
-
-            if (
-    walletLeaderboard[
-        buyer.wallet
-    ]
-) {
-    walletLeaderboard[
-        buyer.wallet
-    ].hit25k++;
-}
-
-        }
-    );
-
-}
-if (
-    token &&
-    token.hit50k &&
-    !token.reward50k
-) {
-
-    token.reward50k = true;
-
-    token.earlyBuyers.forEach(
-        buyer => {
-
-            if (
-    walletLeaderboard[
-        buyer.wallet
-    ]
-) {
-    walletLeaderboard[
-        buyer.wallet
-    ].hit50k++;
-}
-
-        }
-    );
-
-}
-if (
-    token &&
-    token.hit100k &&
-    !token.reward100k
-) {
-
-    token.reward100k = true;
-
-    token.earlyBuyers.forEach(
-        buyer => {
-
-            if (
-    walletLeaderboard[
-        buyer.wallet
-    ]
-) {
-    walletLeaderboard[
-        buyer.wallet
-    ].hit100k++;
-}
-
-        }
-    );
-
-}
-          
-        const uniqueBuyers =
-            buyers.get(
-                event.mint
-            )?.size || 0;
-
-        if (
-            marketCapUsd >= TARGET_MC_USD &&
-            uniqueBuyers >= 75 &&
-            !alerted.has(
-                event.mint
-            )
-        ) {
-
-            alerted.add(
-                event.mint
-            );
-
-            const info =
-                tracked.get(
-                    event.mint
-                );
-
-            await sendAlert(`
+        await sendAlert(`
 🚀 TOKEN REACHED TARGET MC
 
 🪙 Name:
@@ -655,12 +374,9 @@ ${info?.name || event.name || "Unknown"}
 ${info?.symbol || event.symbol || "Unknown"}
 
 📈 Market Cap:
-$${marketCapUsd.toLocaleString(
-    undefined,
-    {
-        maximumFractionDigits: 0
-    }
-)}
+$${marketCapUsd.toLocaleString(undefined, {
+          maximumFractionDigits: 0,
+        })}
 
 👥 Unique Buyers:
 ${uniqueBuyers}
@@ -674,113 +390,66 @@ ${uniqueBuyers}
 🔗 https://pump.fun/coin/${event.mint}
 `);
 
-            console.log(
-                "ALERT:",
-                info?.symbol ||
-                event.symbol
-            );
-
-        }
-
+        console.log("ALERT:", info?.symbol || event.symbol);
+      }
     } catch (err) {
-
-        console.error(
-            "Message error:",
-            err
-        );
-
+      console.error("Message error:", err);
     }
+  });
 
-});
+  ws.on("error", (err) => {
+    console.error("WebSocket error:", err.message);
+  });
 
-ws.on("error", (err) => {
+  ws.on("close", (code, reason) => {
+    console.log("WebSocket closed:", code, reason.toString());
 
-    console.error(
-        "WebSocket error:",
-        err.message
-    );
-
-});
-
-ws.on("close", (code, reason) => {
-
-    console.log(
-        "WebSocket closed:",
-        code,
-        reason.toString()
-    );
-
-    setTimeout(
-        connectWebSocket,
-        5000
-    );
-
-});
-
+    setTimeout(connectWebSocket, 5000);
+  });
 }
 setInterval(async () => {
+  const leaderboard = Object.entries(walletLeaderboard)
 
-    const leaderboard =
-    Object.entries(walletLeaderboard)
+    .filter(([wallet, stats]) => {
+      const ratio = (stats.fastSells || 0) / Math.max(stats.appearances, 1);
 
-    .filter(
-        ([wallet, stats]) => {
-
-            const ratio =
-                (stats.fastSells || 0)
-                /
-                Math.max(
-                    stats.appearances,
-                    1
-                );
-
-            return ratio < 0.5;
-        }
+      return ratio < 0.5;
+    })
+    .sort(
+      (a, b) =>
+        b[1].hit50k * 200 +
+        b[1].hit25k * 50 +
+        b[1].hit10k * 10 -
+        b[1].fastSells * 2 -
+        (a[1].hit50k * 200 +
+          a[1].hit25k * 50 +
+          a[1].hit10k * 10 -
+          a[1].fastSells * 2),
     )
-        .sort(
-    (a, b) =>
-       (
-    b[1].hit100k * 50 +
-    b[1].hit50k * 15 +
-    b[1].hit25k * 5 +
-    b[1].firstPlace * 5 +
-    b[1].top5 * 2 +
-    b[1].appearances
-)
--
-(
-    a[1].hit100k * 50 +
-    a[1].hit50k * 15 +
-    a[1].hit25k * 5 +
-    a[1].firstPlace * 5 +
-    a[1].top5 * 2 +
-    a[1].appearances
-)
-)
-        .slice(0, 20);
+    .slice(0, 20);
 
-    let message =
-`🏆 TOP EARLY WALLETS
+  let message = `🏆 TOP EARLY WALLETS
 Tracked Wallets: ${Object.keys(walletLeaderboard).length}
 
 `;
 
-    leaderboard.forEach(
-        ([wallet, stats], index) => {
-             const score =
-                    stats.hit100k * 50 +
-                    stats.hit50k * 15 +
-                    stats.hit25k * 5 +
-                    stats.firstPlace * 5 +
-                    stats.top5 * 2 +
-                    stats.appearances;
+  leaderboard.forEach(([wallet, stats], index) => {
+    const score =
+      stats.hit50k * 200 +
+      stats.hit25k * 50 +
+      stats.hit10k * 10 -
+      stats.fastSells * 2;
+    const successRate = (
+      (stats.hit10k / Math.max(stats.appearances, 1)) *
+      100
+    ).toFixed(1);
 
-            message +=
-`${index + 1}.
+    message += `${index + 1}.
 \`${wallet}\`
 
 Score: ${score}
 Appearances: ${stats.appearances}
+Success Rate: ${successRate}%
 Top5: ${stats.top5}
 First: ${stats.firstPlace}
 FastSells: ${stats.fastSells || 0}
@@ -790,110 +459,60 @@ FastSells: ${stats.fastSells || 0}
 100k Hits: ${stats.hit100k || 0}
 
 `;
+  });
+  console.log(message);
 
-        }
-    );
-    console.log(message);
-
-    await sendWalletAlert(
-        message
-    );
-    
-
+  await sendWalletAlert(message);
 }, 30 * 1000);
-setTimeout(async () => {
-
-    console.log(
-        walletLeaderboard
-    );
-
-}, 30 * 60 * 1000);
+setTimeout(
+  async () => {
+    console.log(walletLeaderboard);
+  },
+  30 * 60 * 1000,
+);
 connectWebSocket();
-sendWalletAlert(
-    "✅ Wallet Tracker Bot Started"
+sendWalletAlert("✅ Wallet Tracker Bot Started");
+setInterval(
+  () => {
+    const leaderboard = Object.entries(walletLeaderboard)
+      .sort((a, b) => b[1].top5 - a[1].top5)
+      .slice(0, 20);
+
+    console.log("\n===== TOP EARLY WALLETS =====");
+
+    leaderboard.forEach(([wallet, stats], index) => {
+      console.log(`${index + 1}. ${wallet}`);
+
+      console.log(`Appearances: ${stats.appearances}`);
+
+      console.log(`Top5: ${stats.top5}`);
+
+      console.log(`First Buy: ${stats.firstPlace}`);
+    });
+  },
+  10 * 60 * 1000,
 );
 setInterval(() => {
+  const leaderboard = Object.entries(walletTrades)
 
-    const leaderboard =
-        Object.entries(
-            walletLeaderboard
-        )
-        .sort(
-            (a, b) =>
-                b[1].top5 -
-                a[1].top5
-        )
-        .slice(0, 20);
+    .filter(([wallet, stats]) => stats.trades >= 3)
 
-    console.log(
-        "\n===== TOP EARLY WALLETS ====="
-    );
+    .sort((a, b) => {
+      const avgA = a[1].totalMultiple / a[1].trades;
 
-    leaderboard.forEach(
-        ([wallet, stats], index) => {
+      const avgB = b[1].totalMultiple / b[1].trades;
 
-            console.log(
-                `${index + 1}. ${wallet}`
-            );
+      return avgB - avgA;
+    })
 
-            console.log(
-                `Appearances: ${stats.appearances}`
-            );
+    .slice(0, 20);
 
-            console.log(
-                `Top5: ${stats.top5}`
-            );
+  console.log("\n===== TOP PROFITABLE WALLETS =====");
 
-            console.log(
-                `First Buy: ${stats.firstPlace}`
-            );
+  leaderboard.forEach(([wallet, stats], index) => {
+    const avg = (stats.totalMultiple / stats.trades).toFixed(2);
 
-        }
-    );
-
-}, 10 * 60 * 1000);
-setInterval(() => {
-
-    const leaderboard =
-        Object.entries(walletTrades)
-
-        .filter(
-            ([wallet, stats]) =>
-                stats.trades >= 3
-        )
-
-        .sort(
-            (a, b) => {
-
-                const avgA =
-                    a[1].totalMultiple /
-                    a[1].trades;
-
-                const avgB =
-                    b[1].totalMultiple /
-                    b[1].trades;
-
-                return avgB - avgA;
-
-            }
-        )
-
-        .slice(0, 20);
-
-    console.log(
-        "\n===== TOP PROFITABLE WALLETS ====="
-    );
-
-    leaderboard.forEach(
-        ([wallet, stats], index) => {
-
-            const avg =
-                (
-                    stats.totalMultiple /
-                    stats.trades
-                ).toFixed(2);
-
-            console.log(`
+    console.log(`
 ${index + 1}. ${wallet}
 
 Trades: ${stats.trades}
@@ -910,8 +529,5 @@ ${stats.winners5x}
 10x Winners:
 ${stats.winners10x}
 `);
-
-        }
-    );
-
+  });
 }, 30000);
