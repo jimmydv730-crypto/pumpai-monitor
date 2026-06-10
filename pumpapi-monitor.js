@@ -84,7 +84,7 @@ setInterval(() => {
 
         if (
             now - info.createdAt >
-            6 * 60 * 60 * 1000
+           10 * 60 * 1000
         ) {
           const buyersForToken =
     tokenBuyers.get(mint) || [];
@@ -97,6 +97,11 @@ buyersForToken.forEach(
         const multiple =
             info.athMc /
             buyer.buyMc;
+            console.log(
+    buyer.wallet,
+    "MULTIPLE:",
+    multiple.toFixed(2)
+);
 
         if (
             !walletTrades[
