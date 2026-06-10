@@ -408,7 +408,14 @@ ${uniqueBuyers}
   });
 }
 setInterval(async () => {
-  const leaderboard = Object.entries(walletLeaderboard)
+ const leaderboard = Object.entries(walletLeaderboard)
+
+.filter(
+    ([wallet, stats]) =>
+        stats.appearances >= 10
+)
+  
+  
 
     .filter(([wallet, stats]) => {
       const ratio = (stats.fastSells || 0) / Math.max(stats.appearances, 1);
@@ -434,22 +441,25 @@ Tracked Wallets: ${Object.keys(walletLeaderboard).length}
 `;
 
   leaderboard.forEach(([wallet, stats], index) => {
-    const score =
-      stats.hit50k * 200 +
-      stats.hit25k * 50 +
-      stats.hit10k * 10 -
-      stats.fastSells * 2;
-    const successRate = (
-      (stats.hit10k / Math.max(stats.appearances, 1)) *
-      100
-    ).toFixed(1);
+    const successRate =
+    stats.hit10k /
+    Math.max(stats.appearances, 1);
+
+const score =
+    successRate * 1000 +
+    stats.hit50k * 200 +
+    stats.hit25k * 50 -
+    stats.fastSells * 2;
+
+const successRateDisplay =
+    (successRate * 100).toFixed(1);
 
     message += `${index + 1}.
 \`${wallet}\`
 
 Score: ${score}
 Appearances: ${stats.appearances}
-Success Rate: ${successRate}%
+Success Rate: ${successRateDisplay}%
 Top5: ${stats.top5}
 First: ${stats.firstPlace}
 FastSells: ${stats.fastSells || 0}
@@ -475,6 +485,11 @@ sendWalletAlert("✅ Wallet Tracker Bot Started");
 setInterval(
   () => {
     const leaderboard = Object.entries(walletLeaderboard)
+
+.filter(
+    ([wallet, stats]) =>
+        stats.appearances >= 10
+)
       .sort((a, b) => b[1].top5 - a[1].top5)
       .slice(0, 20);
 
