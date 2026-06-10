@@ -31,6 +31,8 @@ const buyers = new Map();
 const walletLeaderboard = {};
 const earlyWallets = new Map();
 const walletPositions = new Map();
+const walletTrades = {};
+const tokenBuyers = new Map();
 
 
 const TARGET_MC_USD = 19000;
@@ -84,7 +86,64 @@ setInterval(() => {
             now - info.createdAt >
             6 * 60 * 60 * 1000
         ) {
-            tracked.delete(mint);
+          const buyersForToken =
+    tokenBuyers.get(mint) || [];
+
+buyersForToken.forEach(
+    buyer => {
+        if (buyer.buyMc > 25000)
+    return;
+
+        const multiple =
+            info.athMc /
+            buyer.buyMc;
+
+        if (
+            !walletTrades[
+                buyer.wallet
+            ]
+        ) {
+
+            walletTrades[
+                buyer.wallet
+            ] = {
+
+                trades: 0,
+
+                totalMultiple: 0,
+
+                winners2x: 0,
+                winners5x: 0,
+                winners10x: 0
+
+            };
+
+        }
+
+        const stats =
+            walletTrades[
+                buyer.wallet
+            ];
+
+        stats.trades++;
+
+        stats.totalMultiple +=
+            multiple;
+
+        if (multiple >= 2)
+            stats.winners2x++;
+
+        if (multiple >= 5)
+            stats.winners5x++;
+
+        if (multiple >= 10)
+            stats.winners10x++;
+
+    }
+);
+tokenBuyers.delete(mint);
+buyers.delete(mint);            
+tracked.delete(mint);
         }
 
     }
@@ -213,6 +272,10 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
                 event.mint,
                 new Set()
             );
+            tokenBuyers.set(
+    event.mint,
+    []
+);
 
             console.log(
                 "TRACKING:",
@@ -251,10 +314,7 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
             const token =
                 tracked.get(event.mint);
 
-            if (
-                token &&
-                token.earlyBuyers.length < 20
-            ) {
+            {
 
                 const alreadyExists =
                     token.earlyBuyers.some(
@@ -384,6 +444,50 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(
         // Alert once when target MC reached
         const marketCapUsd =
             event.marketCapQuote;
+            if (
+    event.action === "buy"
+) {
+
+    tokenBuyers
+    .get(event.mint)
+    ?.push({
+
+        wallet:
+            event.txSigner,
+
+        buyMc:
+            marketCapUsd
+
+    });
+
+}
+         if (
+    !walletTrades[
+        event.txSigner
+    ]
+) {
+
+    walletTrades[
+        event.txSigner
+    ] = {
+        trades: 0,
+
+        totalMultiple: 0,
+
+        winners2x: 0,
+        winners5x: 0,
+        winners10x: 0
+    };
+
+}
+
+walletPositions.set(
+    `${event.txSigner}_${event.mint}`,
+    {
+        buyMc: marketCapUsd,
+        buyTime: Date.now()
+    }
+);
             console.log({
     symbol: event.symbol,
     marketCapQuote: event.marketCapQuote,
@@ -743,3 +847,66 @@ setInterval(() => {
     );
 
 }, 10 * 60 * 1000);
+setInterval(() => {
+
+    const leaderboard =
+        Object.entries(walletTrades)
+
+        .filter(
+            ([wallet, stats]) =>
+                stats.trades >= 3
+        )
+
+        .sort(
+            (a, b) => {
+
+                const avgA =
+                    a[1].totalMultiple /
+                    a[1].trades;
+
+                const avgB =
+                    b[1].totalMultiple /
+                    b[1].trades;
+
+                return avgB - avgA;
+
+            }
+        )
+
+        .slice(0, 20);
+
+    console.log(
+        "\n===== TOP PROFITABLE WALLETS ====="
+    );
+
+    leaderboard.forEach(
+        ([wallet, stats], index) => {
+
+            const avg =
+                (
+                    stats.totalMultiple /
+                    stats.trades
+                ).toFixed(2);
+
+            console.log(`
+${index + 1}. ${wallet}
+
+Trades: ${stats.trades}
+
+Average Multiple:
+${avg}x
+
+2x Winners:
+${stats.winners2x}
+
+5x Winners:
+${stats.winners5x}
+
+10x Winners:
+${stats.winners10x}
+`);
+
+        }
+    );
+
+}, 30000);
