@@ -273,7 +273,8 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
       }
 
       // Alert once when target MC reached
-      const marketCapUsd = event.marketCapQuote;
+      const marketCapUsd =
+    event.marketCapQuote * solPrice;
       if (event.action === "buy") {
         tokenBuyers.get(event.mint)?.push({
           wallet: event.txSigner,
