@@ -354,6 +354,12 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
       }
 
       const uniqueBuyers = buyers.get(event.mint)?.size || 0;
+      console.log(
+    "TARGET CHECK",
+    event.symbol,
+    marketCapUsd,
+    uniqueBuyers
+);
 
       if (
         marketCapUsd >= TARGET_MC_USD &&
