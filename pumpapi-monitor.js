@@ -31,7 +31,7 @@ const walletPositions = new Map();
 const walletTrades = {};
 const tokenBuyers = new Map();
 
-const TARGET_MC_USD = 19000;
+const TARGET_MC_USD = 5000;
 
 async function updateSolPrice() {
   try {
@@ -364,7 +364,7 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
 
       if (
         marketCapUsd >= TARGET_MC_USD &&
-        uniqueBuyers >= 75 &&
+        uniqueBuyers >= 10 &&
         !alerted.has(event.mint)
       ) {
         alerted.add(event.mint);
