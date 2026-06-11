@@ -59,7 +59,7 @@ setInterval(() => {
   const now = Date.now();
 
   for (const [mint, info] of tracked) {
-    if (now - info.createdAt > 10 * 60 * 1000) {
+    if (now - info.createdAt > 60 * 60 * 1000) {
       const buyersForToken = tokenBuyers.get(mint) || [];
 
       buyersForToken.forEach((buyer) => {
@@ -364,7 +364,7 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
 
       if (
         marketCapUsd >= TARGET_MC_USD &&
-        uniqueBuyers >= 10 &&
+        uniqueBuyers >= 25 &&
         !alerted.has(event.mint)
       ) {
         alerted.add(event.mint);
@@ -429,17 +429,23 @@ setInterval(async () => {
 
       return ratio < 0.5;
     })
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+
+    const scoreA =
+        (a[1].hit10k / Math.max(a[1].appearances, 1)) * 1000 +
+        a[1].hit50k * 200 +
+        a[1].hit25k * 50 -
+        a[1].fastSells * 2;
+
+    const scoreB =
+        (b[1].hit10k / Math.max(b[1].appearances, 1)) * 1000 +
         b[1].hit50k * 200 +
-        b[1].hit25k * 50 +
-        b[1].hit10k * 10 -
-        b[1].fastSells * 2 -
-        (a[1].hit50k * 200 +
-          a[1].hit25k * 50 +
-          a[1].hit10k * 10 -
-          a[1].fastSells * 2),
-    )
+        b[1].hit25k * 50 -
+        b[1].fastSells * 2;
+
+    return scoreB - scoreA;
+
+})
     .slice(0, 20);
 
   let message = `🏆 TOP EARLY WALLETS
