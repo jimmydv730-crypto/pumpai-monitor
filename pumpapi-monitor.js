@@ -297,12 +297,10 @@ $${((event.marketCapSol || 0) * solPrice).toLocaleString(undefined, {
         buyMc: marketCapUsd,
         buyTime: Date.now(),
       });
-      console.log({
-        symbol: event.symbol,
-        marketCapQuote: event.marketCapQuote,
-        solPrice,
-        calculatedMc: marketCapUsd,
-      });
+      console.log(
+  "RAW EVENT:\n",
+  JSON.stringify(event, null, 2)
+);
       const token = tracked.get(event.mint);
 
       if (token) {
