@@ -419,7 +419,7 @@ setInterval(async () => {
 
 .filter(
     ([wallet, stats]) =>
-        stats.appearances >= 1
+        stats.appearances >= 5
 )
   
   
