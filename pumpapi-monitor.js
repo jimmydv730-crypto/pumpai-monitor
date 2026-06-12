@@ -31,7 +31,7 @@ const walletPositions = new Map();
 const walletTrades = {};
 const tokenBuyers = new Map();
 
-const TARGET_MC_USD = 5000;
+const TARGET_MC_USD = 15000;
 
 async function updateSolPrice() {
   try {
@@ -419,7 +419,7 @@ setInterval(async () => {
 
 .filter(
     ([wallet, stats]) =>
-        stats.appearances >= 10
+        stats.appearances >= 1
 )
   
   
