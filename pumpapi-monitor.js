@@ -31,7 +31,7 @@ const walletPositions = new Map();
 const walletTrades = {};
 const tokenBuyers = new Map();
 
-const TARGET_MC_USD = 15000;
+const TARGET_MC_USD = 3000;
 
 async function updateSolPrice() {
   try {
