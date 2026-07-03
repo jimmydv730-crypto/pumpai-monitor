@@ -15,7 +15,7 @@ app.get("/", (req, res) => {
   res.send("PumpAPI Monitor Running");
 });
 
-app.listen(process.env.PORT || 3000, () => {
+app.listen(process.env.PORT || 10000, () => {
   console.log("Health server started");
 });
 
